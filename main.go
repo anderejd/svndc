@@ -3,32 +3,37 @@ package main
 import "fmt"
 import "io/ioutil"
 import "log"
+import "net/url"
 import "os"
 import "os/exec"
+import "path/filepath"
+import "strings"
 
 
-func execPiped(name string, arg ...string) error {
-	cmd := exec.Command(name, arg)
-	cmd.Stdout = os.Stdout
-	cmd.Stdin  = os.Stdin
-	return cmd.Run()
-}
-
-
-func cleanWcRoot(wc_path string) err error {
+func cleanWcRoot(wc_path string) (err error) {
 	infos, err := ioutil.ReadDir(wc_path)
 	if nil != err {
 		return
 	}
 	for _, inf := range infos {
-		fmt.Println(inf)
+		fmt.Println(inf.Name())
 	}
 	return nil
 }
 
 
-func svnDiffCommit(repos_path string, wc_path string) err error{
-	err = execPiped("svn", "checkout", repos_path, wc_path)
+func execPiped(name string, arg ...string) error {
+	fmt.Println(name + " " + strings.Join(arg, " "))
+	cmd := exec.Command(name, arg...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin  = os.Stdin
+	return cmd.Run()
+}
+
+
+func svnDiffCommit(repos *url.URL, wc_path string) (err error) {
+	err = execPiped("svn", "checkout", repos.String(), wc_path)
 	if nil != err {
 		return
 	}
@@ -44,23 +49,37 @@ func svnDiffCommit(repos_path string, wc_path string) err error{
 }
 
 
-func testSelf() err error {
+func testSelf() (err error) {
 	fmt.Println("Self test --> Start...")
-	repos_path := "./self_test/repos/"
-	wc_path := "./self_test/wc/"
+	test_path := "./self_test/"
+	repos_path := test_path + "repos/"
+	wc_path := test_path + "wc/"
+	err = os.Mkdir(test_path, 0755)
+	if nil != err {
+		return
+	}
+	defer func() {
+		err = os.RemoveAll(test_path)
+	}()
 	err = execPiped("svnadmin", "create", repos_path)
 	if nil != err {
 		return
 	}
-	err = svnDiffCommit(repos_path, wc_path)
+	abs_repos_path, err := filepath.Abs(repos_path)
 	if nil != err {
 		return
 	}
-	err = os.RemoveAll(repos_path)
+	abs_repos_path = "file://" + abs_repos_path
+	repos_url, err := url.Parse(abs_repos_path)
+	if nil != err {
+		return
+	}
+	err = svnDiffCommit(repos_url, wc_path)
 	if nil != err {
 		return
 	}
 	fmt.Println("Self test --> Done.")
+	return nil
 }
 
 
