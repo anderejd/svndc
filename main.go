@@ -10,13 +10,20 @@ import "path/filepath"
 import "strings"
 
 
-func cleanWcRoot(wc_path string) (err error) {
-	infos, err := ioutil.ReadDir(wc_path)
+func cleanWcRoot(wcPath string) (err error) {
+	infos, err := ioutil.ReadDir(wcPath)
 	if nil != err {
 		return
 	}
 	for _, inf := range infos {
-		fmt.Println(inf.Name())
+		if ".svn" == inf.Name() {
+			continue
+		}
+		fullPath := filepath.Join(wcPath, inf.Name())
+		err = os.RemoveAll(fullPath)
+		if nil != err {
+			return
+		}
 	}
 	return nil
 }
@@ -32,15 +39,16 @@ func execPiped(name string, arg ...string) error {
 }
 
 
-func svnDiffCommit(repos *url.URL, wc_path string) (err error) {
-	err = execPiped("svn", "checkout", repos.String(), wc_path)
+func svnDiffCommit(srcPath string, wcPath string, repos *url.URL) (err error) {
+	err = execPiped("svn", "checkout", repos.String(), wcPath)
 	if nil != err {
 		return
 	}
-	err = cleanWcRoot(wc_path)
+	err = cleanWcRoot(wcPath)
 	if nil != err {
 		return
 	}
+	fmt.Println(srcPath) // remove later
 	// copy all files and folders from source to working copy
 	// svn status
 	// svn remove all missing files
@@ -49,38 +57,66 @@ func svnDiffCommit(repos *url.URL, wc_path string) (err error) {
 }
 
 
-func createRepos(repos_path string) (repos *url.URL, err error) {
-	err = execPiped("svnadmin", "create", repos_path)
+func createRepos(reposPath string) (repos *url.URL, err error) {
+	err = execPiped("svnadmin", "create", reposPath)
 	if nil != err {
 		return
 	}
-	abs_repos_path, err := filepath.Abs(repos_path)
+	absReposPath, err := filepath.Abs(reposPath)
 	if nil != err {
 		return
 	}
-	abs_repos_path = "file://" + abs_repos_path
-	repos, err = url.Parse(abs_repos_path)
-		return
+	absReposPath = "file://" + absReposPath
+	repos, err = url.Parse(absReposPath)
+	return
 }
 
 
-func testSelf() (err error) {
-	fmt.Print("\n\nSelf test --> Start...\n\n\n")
-	test_path := "./self_test/"
-	repos_path := test_path + "repos/"
-	wc_path := test_path + "wc/"
-	err = os.Mkdir(test_path, 0755)
+func createTestSourceFiles(path string) (err error) {
+	err = os.Mkdir(path, 0755)
 	if nil != err {
 		return
 	}
-	defer func() {
-		inner_err := os.RemoveAll(test_path)
-		if nil != inner_err {
-			err = inner_err
-		}
-	}()
-	repos_url, err := createRepos(repos_path)
-	err = svnDiffCommit(repos_url, wc_path)
+	// create test files and folders
+	return nil
+}
+
+
+func setupTest(testPath string) (repos *url.URL, srcPath string, err error) {
+	err = os.Mkdir(testPath, 0755)
+	if nil != err {
+		return
+	}
+	srcPath = testPath + "src/"
+	err = createTestSourceFiles(srcPath)
+	if nil != err {
+		return
+	}
+	reposPath := testPath + "repos/"
+	repos, err = createRepos(reposPath)
+	return
+}
+
+
+func teardownTest(testPath string) {
+	err := os.RemoveAll(testPath)
+	if nil != err {
+		log.Println("ERROR: ", err)
+	}
+}
+
+
+func runSelfTest() (err error) {
+	fmt.Print("\n\nSelf test --> Start...\n\n\n")
+	testPath := "./self_test/"
+	reposUrl, srcPath, err := setupTest(testPath)
+	if nil != err {
+		return
+	}
+	fmt.Println(srcPath) // remove later
+	defer teardownTest(testPath)
+	wcPath := testPath + "wc/"
+	err = svnDiffCommit(srcPath, wcPath, reposUrl)
 	if nil != err {
 		return
 	}
@@ -90,7 +126,7 @@ func testSelf() (err error) {
 
 
 func main() {
-	err := testSelf()
+	err := runSelfTest()
 	if nil != err {
 		log.Fatal(err)
 	}
