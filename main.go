@@ -49,6 +49,21 @@ func svnDiffCommit(repos *url.URL, wc_path string) (err error) {
 }
 
 
+func createRepos(repos_path string) (repos *url.URL, err error) {
+	err = execPiped("svnadmin", "create", repos_path)
+	if nil != err {
+		return
+	}
+	abs_repos_path, err := filepath.Abs(repos_path)
+	if nil != err {
+		return
+	}
+	abs_repos_path = "file://" + abs_repos_path
+	repos, err = url.Parse(abs_repos_path)
+	return
+}
+
+
 func testSelf() (err error) {
 	fmt.Println("Self test --> Start...")
 	test_path := "./self_test/"
@@ -59,21 +74,12 @@ func testSelf() (err error) {
 		return
 	}
 	defer func() {
-		err = os.RemoveAll(test_path)
+		inner_err := os.RemoveAll(test_path)
+		if nil != inner_err {
+			err = inner_err
+		}
 	}()
-	err = execPiped("svnadmin", "create", repos_path)
-	if nil != err {
-		return
-	}
-	abs_repos_path, err := filepath.Abs(repos_path)
-	if nil != err {
-		return
-	}
-	abs_repos_path = "file://" + abs_repos_path
-	repos_url, err := url.Parse(abs_repos_path)
-	if nil != err {
-		return
-	}
+	repos_url, err := createRepos(repos_path)
 	err = svnDiffCommit(repos_url, wc_path)
 	if nil != err {
 		return
