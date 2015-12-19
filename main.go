@@ -9,7 +9,6 @@ import "os/exec"
 import "path/filepath"
 import "strings"
 
-
 func cleanWcRoot(wcPath string) (err error) {
 	infos, err := ioutil.ReadDir(wcPath)
 	if nil != err {
@@ -28,16 +27,14 @@ func cleanWcRoot(wcPath string) (err error) {
 	return nil
 }
 
-
 func execPiped(name string, arg ...string) error {
 	fmt.Println(name + " " + strings.Join(arg, " "))
 	cmd := exec.Command(name, arg...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Stdin  = os.Stdin
+	cmd.Stdin = os.Stdin
 	return cmd.Run()
 }
-
 
 func svnDiffCommit(srcPath string, wcPath string, repos *url.URL) (err error) {
 	err = execPiped("svn", "checkout", repos.String(), wcPath)
@@ -56,7 +53,6 @@ func svnDiffCommit(srcPath string, wcPath string, repos *url.URL) (err error) {
 	return nil
 }
 
-
 func createRepos(reposPath string) (repos *url.URL, err error) {
 	err = execPiped("svnadmin", "create", reposPath)
 	if nil != err {
@@ -71,7 +67,6 @@ func createRepos(reposPath string) (repos *url.URL, err error) {
 	return
 }
 
-
 func createTestSourceFiles(path string) (err error) {
 	err = os.Mkdir(path, 0755)
 	if nil != err {
@@ -80,7 +75,6 @@ func createTestSourceFiles(path string) (err error) {
 	// create test files and folders
 	return nil
 }
-
 
 func setupTest(testPath string) (repos *url.URL, srcPath string, err error) {
 	err = os.Mkdir(testPath, 0755)
@@ -97,14 +91,12 @@ func setupTest(testPath string) (repos *url.URL, srcPath string, err error) {
 	return
 }
 
-
 func teardownTest(testPath string) {
 	err := os.RemoveAll(testPath)
 	if nil != err {
 		log.Println("ERROR: ", err)
 	}
 }
-
 
 func runSelfTest() (err error) {
 	fmt.Print("\n\nSelf test --> Start...\n\n\n")
@@ -124,12 +116,9 @@ func runSelfTest() (err error) {
 	return nil
 }
 
-
 func main() {
 	err := runSelfTest()
 	if nil != err {
 		log.Fatal(err)
 	}
 }
-
-
