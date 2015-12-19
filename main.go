@@ -60,12 +60,12 @@ func createRepos(repos_path string) (repos *url.URL, err error) {
 	}
 	abs_repos_path = "file://" + abs_repos_path
 	repos, err = url.Parse(abs_repos_path)
-	return
+		return
 }
 
 
 func testSelf() (err error) {
-	fmt.Println("Self test --> Start...")
+	fmt.Print("\n\nSelf test --> Start...\n\n\n")
 	test_path := "./self_test/"
 	repos_path := test_path + "repos/"
 	wc_path := test_path + "wc/"
@@ -84,7 +84,7 @@ func testSelf() (err error) {
 	if nil != err {
 		return
 	}
-	fmt.Println("Self test --> Done.")
+	fmt.Print("\n\nSelf test --> Success.\n\n\n")
 	return nil
 }
 
