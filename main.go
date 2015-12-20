@@ -2,6 +2,7 @@ package main
 
 import "fmt"
 import "io/ioutil"
+import "io"
 import "log"
 import "net/url"
 import "os"
@@ -36,6 +37,59 @@ func execPiped(name string, arg ...string) error {
 	return cmd.Run()
 }
 
+func copyFile(src, dst string) (err error) {
+	fmt.Println(src)
+	fmt.Println(dst)
+	fmt.Println()
+	s, err := os.Open(src)
+	if err != nil {
+		return
+	}
+	defer func() {
+		closeErr := s.Close()
+		if nil == err {
+			err = closeErr
+		}
+	}()
+	d, err := os.Create(dst)
+	if err != nil {
+		return
+	}
+	_, err = io.Copy(d, s)
+	if nil != err {
+		d.Close()
+		return
+	}
+	return d.Close()
+}
+
+func copyRecursive(srcDir, dstDir string) (err error) {
+	err = os.MkdirAll(dstDir, perm)
+	if nil != err {
+		return
+	}
+	infs, err := ioutil.ReadDir(srcDir)
+	if nil != err {
+		return
+	}
+	for _, inf := range infs {
+		src := filepath.Join(srcDir, inf.Name())
+		dst := filepath.Join(dstDir, inf.Name())
+		if inf.IsDir() {
+			err = copyRecursive(src, dst)
+			if nil != err {
+				return
+			}
+			continue
+		}
+		err = copyFile(src, dst)
+		if nil != err {
+			return
+		}
+	}
+	return nil
+}
+
 func svnDiffCommit(srcPath string, wcPath string, repos *url.URL) (err error) {
 	err = execPiped("svn", "checkout", repos.String(), wcPath)
 	if nil != err {
@@ -45,8 +99,10 @@ func svnDiffCommit(srcPath string, wcPath string, repos *url.URL) (err error) {
 	if nil != err {
 		return
 	}
-	fmt.Println(srcPath) // remove later
-	// copy all files and folders from source to working copy
+	err = copyRecursive(srcPath, wcPath)
+	if nil != err {
+		return
+	}
 	// svn status
 	// svn remove all missing files
 	// svn commit
@@ -68,18 +124,18 @@ func createRepos(reposPath string) (repos *url.URL, err error) {
 }
 
 type testData struct {
-	Path    string
-	IsDir   bool
-	Content string
+	Path string;
+	IsDir bool;
+	Content string;
 }
 
 func makeTestData() []testData {
-	result := []testData{
-		{"1.txt", false, "data1"},
-		{"2.txt", false, "data2"},
-		{"subdir1", true, ""},
-		{filepath.Join("subdir1", "1.txt"), false, "subdata1"},
-		{"subdir2", true, ""}}
+	result := []testData {
+		{ "1.txt", false, "data1" },
+		{ "2.txt", false, "data2" },
+		{ "subdir1", true, "" },
+		{ filepath.Join("subdir1", "1.txt"), false, "subdata1" },
+		{ "subdir2", true, "" } }
 	return result
 }
 
@@ -153,3 +209,4 @@ func main() {
 		log.Fatal(err)
 	}
 }
+
