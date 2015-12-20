@@ -92,7 +92,26 @@ func execPrint(name string, arg ...string) ([]byte, error) {
 	return exec.Command(name, arg...).Output()
 }
 
-func svnDiffCommit(srcPath string, wcPath string, repos *url.URL) (err error) {
+type svnOptions struct {
+	Username *string // --username ARG
+	Password *string // --password ARG
+	NoAuthCache bool // --no-auth-cache
+	//REQUIRED NonInteractive bool // --non-ineractive
+	TrustServerCertFailures *string // --trust-server-cert-failures ARG 'unknown-ca' 'cn-mismatch' 'expired' 'not-yet-valid' 'other' 
+	ConfigDir *string // config-dir ARG
+	ConfigOption *string // --config-options ARG
+	CommitMessage string // --message ARG
+}
+
+func makeGlobalArgs(opts svnOptions) []string {
+	return []string{}
+}
+
+func svnDiffCommit(
+		srcPath string,
+		wcPath string,
+		repos *url.URL,
+		opts svnOptions) (err error) {
 	err = execPiped("svn", "checkout", repos.String(), wcPath)
 	if nil != err {
 		return
@@ -110,14 +129,17 @@ func svnDiffCommit(srcPath string, wcPath string, repos *url.URL) (err error) {
 		return
 	}
 	out, err := execPrint("svn", "status", wcPath)
-	if err != nil {
+	if nil != err {
 		return
 	}
-	statusOut := string(out)
-	fmt.Println(statusOut)
-	// svn remove all missing files
-	// svn commit
-	return nil
+	statusLines := strings.Split(string(out), "\n")
+	for _, line := range statusLines {
+		// svn remove all missing files
+		fmt.Println(line) // TODO: avoid printing an extra line 
+	}
+	commitArgs := []string{"commit", wcPath}
+	commitArgs = append(commitArgs, "--message", "hej hej :D")
+	return execPiped("svn", commitArgs...)
 }
 
 func createRepos(reposPath string) (repos *url.URL, err error) {
@@ -206,7 +228,8 @@ func runSelfTest() (err error) {
 	}
 	defer teardownTest(testPath)
 	wcPath := filepath.Join(testPath, "wc")
-	err = svnDiffCommit(srcPath, wcPath, reposUrl)
+	var opts svnOptions
+	err = svnDiffCommit(srcPath, wcPath, reposUrl, opts)
 	if nil != err {
 		return
 	}
