@@ -124,18 +124,18 @@ func createRepos(reposPath string) (repos *url.URL, err error) {
 }
 
 type testData struct {
-	Path string;
-	IsDir bool;
-	Content string;
+	Path    string
+	IsDir   bool
+	Content string
 }
 
 func makeTestData() []testData {
-	result := []testData {
-		{ "1.txt", false, "data1" },
-		{ "2.txt", false, "data2" },
-		{ "subdir1", true, "" },
-		{ filepath.Join("subdir1", "1.txt"), false, "subdata1" },
-		{ "subdir2", true, "" } }
+	result := []testData{
+		{"1.txt", false, "data1"},
+		{"2.txt", false, "data2"},
+		{"subdir1", true, ""},
+		{filepath.Join("subdir1", "1.txt"), false, "subdata1"},
+		{"subdir2", true, ""}}
 	return result
 }
 
@@ -209,4 +209,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-
