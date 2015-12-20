@@ -93,14 +93,14 @@ func execPrint(name string, arg ...string) ([]byte, error) {
 }
 
 type svnOptions struct {
-	Username *string // --username ARG
-	Password *string // --password ARG
-	NoAuthCache bool // --no-auth-cache
+	Username    *string // --username ARG
+	Password    *string // --password ARG
+	NoAuthCache bool    // --no-auth-cache
 	//REQUIRED NonInteractive bool // --non-ineractive
-	TrustServerCertFailures *string // --trust-server-cert-failures ARG 'unknown-ca' 'cn-mismatch' 'expired' 'not-yet-valid' 'other' 
-	ConfigDir *string // config-dir ARG
-	ConfigOption *string // --config-options ARG
-	CommitMessage string // --message ARG
+	TrustServerCertFailures *string // --trust-server-cert-failures ARG 'unknown-ca' 'cn-mismatch' 'expired' 'not-yet-valid' 'other'
+	ConfigDir               *string // config-dir ARG
+	ConfigOption            *string // --config-options ARG
+	CommitMessage           string  // --message ARG
 }
 
 func makeGlobalArgs(opts svnOptions) []string {
@@ -108,10 +108,10 @@ func makeGlobalArgs(opts svnOptions) []string {
 }
 
 func svnDiffCommit(
-		srcPath string,
-		wcPath string,
-		repos *url.URL,
-		opts svnOptions) (err error) {
+	srcPath string,
+	wcPath string,
+	repos *url.URL,
+	opts svnOptions) (err error) {
 	err = execPiped("svn", "checkout", repos.String(), wcPath)
 	if nil != err {
 		return
@@ -135,7 +135,7 @@ func svnDiffCommit(
 	statusLines := strings.Split(string(out), "\n")
 	for _, line := range statusLines {
 		// svn remove all missing files
-		fmt.Println(line) // TODO: avoid printing an extra line 
+		fmt.Println(line) // TODO: avoid printing an extra line
 	}
 	commitArgs := []string{"commit", wcPath}
 	commitArgs = append(commitArgs, "--message", "hej hej :D")
