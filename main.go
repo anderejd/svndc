@@ -67,39 +67,41 @@ func createRepos(reposPath string) (repos *url.URL, err error) {
 	return
 }
 
-struct testData {
+type testData struct {
 	Path string;
-	Content string;
 	IsDir bool;
+	Content string;
 }
 
 func makeTestData() []testData {
-	var result []testData = {
+	result := []testData {
 		{ "1.txt", false, "data1" },
 		{ "2.txt", false, "data2" },
 		{ "subdir1", true, "" },
 		{ filepath.Join("subdir1", "1.txt"), false, "subdata1" },
-		{ "subdir2", true, "" }
-	}
+		{ "subdir2", true, "" } }
 	return result
 }
 
+const perm = 0755
+
 func createTestSourceFiles(basePath string) (err error) {
-	err = os.Mkdir(path, 0755)
+	err = os.Mkdir(basePath, perm)
 	if nil != err {
 		return
 	}
-	testDatas := makeTestData(basePath)
+	testDatas := makeTestData()
 	for _, td := range testDatas {
+		path := filepath.Join(basePath, td.Path)
 		if td.IsDir {
-			err = os.Mkdir(td.Path)
-			if nil != nil {
+			err = os.Mkdir(path, perm)
+			if nil != err {
 				return
 			}
 			continue
 		}
-		err = ioutil.WriteFile(td.Path, td.Content, 0755)
-		if nil != nil {
+		err = ioutil.WriteFile(path, []byte(td.Content), perm)
+		if nil != err {
 			return
 		}
 	}
@@ -107,7 +109,7 @@ func createTestSourceFiles(basePath string) (err error) {
 }
 
 func setupTest(testPath string) (repos *url.URL, srcPath string, err error) {
-	err = os.Mkdir(testPath, 0755)
+	err = os.Mkdir(testPath, perm)
 	if nil != err {
 		return
 	}
