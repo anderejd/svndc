@@ -67,12 +67,42 @@ func createRepos(reposPath string) (repos *url.URL, err error) {
 	return
 }
 
-func createTestSourceFiles(path string) (err error) {
+struct testData {
+	Path string;
+	Content string;
+	IsDir bool;
+}
+
+func makeTestData() []testData {
+	var result []testData = {
+		{ "1.txt", false, "data1" },
+		{ "2.txt", false, "data2" },
+		{ "subdir1", true, "" },
+		{ filepath.Join("subdir1", "1.txt"), false, "subdata1" },
+		{ "subdir2", true, "" }
+	}
+	return result
+}
+
+func createTestSourceFiles(basePath string) (err error) {
 	err = os.Mkdir(path, 0755)
 	if nil != err {
 		return
 	}
-	// create test files and folders
+	testDatas := makeTestData(basePath)
+	for _, td := range testDatas {
+		if td.IsDir {
+			err = os.Mkdir(td.Path)
+			if nil != nil {
+				return
+			}
+			continue
+		}
+		err = ioutil.WriteFile(td.Path, td.Content, 0755)
+		if nil != nil {
+			return
+		}
+	}
 	return nil
 }
 
@@ -81,12 +111,12 @@ func setupTest(testPath string) (repos *url.URL, srcPath string, err error) {
 	if nil != err {
 		return
 	}
-	srcPath = testPath + "src/"
+	srcPath = filepath.Join(testPath, "src")
 	err = createTestSourceFiles(srcPath)
 	if nil != err {
 		return
 	}
-	reposPath := testPath + "repos/"
+	reposPath := filepath.Join(testPath, "repos")
 	repos, err = createRepos(reposPath)
 	return
 }
@@ -100,14 +130,13 @@ func teardownTest(testPath string) {
 
 func runSelfTest() (err error) {
 	fmt.Print("\n\nSelf test --> Start...\n\n\n")
-	testPath := "./self_test/"
+	testPath := filepath.Join(".", "self_test")
 	reposUrl, srcPath, err := setupTest(testPath)
 	if nil != err {
 		return
 	}
-	fmt.Println(srcPath) // remove later
 	defer teardownTest(testPath)
-	wcPath := testPath + "wc/"
+	wcPath := filepath.Join(testPath, "wc")
 	err = svnDiffCommit(srcPath, wcPath, reposUrl)
 	if nil != err {
 		return
