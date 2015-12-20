@@ -38,9 +38,6 @@ func execPiped(name string, arg ...string) error {
 }
 
 func copyFile(src, dst string) (err error) {
-	fmt.Println(src)
-	fmt.Println(dst)
-	fmt.Println()
 	s, err := os.Open(src)
 	if err != nil {
 		return
@@ -90,6 +87,11 @@ func copyRecursive(srcDir, dstDir string) (err error) {
 	return nil
 }
 
+func execPrint(name string, arg ...string) ([]byte, error) {
+	fmt.Println(name + " " + strings.Join(arg, " "))
+	return exec.Command(name, arg...).Output()
+}
+
 func svnDiffCommit(srcPath string, wcPath string, repos *url.URL) (err error) {
 	err = execPiped("svn", "checkout", repos.String(), wcPath)
 	if nil != err {
@@ -103,7 +105,16 @@ func svnDiffCommit(srcPath string, wcPath string, repos *url.URL) (err error) {
 	if nil != err {
 		return
 	}
-	// svn status
+	err = execPiped("svn", "add", wcPath, "--force")
+	if nil != err {
+		return
+	}
+	out, err := execPrint("svn", "status", wcPath)
+	if err != nil {
+		return
+	}
+	statusOut := string(out)
+	fmt.Println(statusOut)
 	// svn remove all missing files
 	// svn commit
 	return nil
