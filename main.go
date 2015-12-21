@@ -92,54 +92,45 @@ func execPrint(name string, arg ...string) ([]byte, error) {
 	return exec.Command(name, arg...).Output()
 }
 
-type svnOptions struct {
-	Username    *string // --username ARG
-	Password    *string // --password ARG
-	NoAuthCache bool    // --no-auth-cache
-	//REQUIRED NonInteractive bool // --non-ineractive
-	TrustServerCertFailures *string // --trust-server-cert-failures ARG 'unknown-ca' 'cn-mismatch' 'expired' 'not-yet-valid' 'other'
-	ConfigDir               *string // config-dir ARG
-	ConfigOption            *string // --config-options ARG
-	CommitMessage           string  // --message ARG
+// TODO: append global svn options if provided
+func svnCheckout(repos *url.URL, wcPath string, ga globalArgs) error {
+	args := []string{ "checkout", repos.String(), wcPath }
+	return execPiped("svn", args...)
 }
 
-func makeGlobalArgs(opts svnOptions) []string {
-	return []string{}
+// TODO: append global svn options if provided
+func svnCommit(wcPath, message string, ga globalArgs) error {
+	args := []string{"commit", wcPath, "--message", message}
+	return execPiped("svn", args...)
 }
 
-func svnDiffCommit(
-	srcPath string,
-	wcPath string,
-	repos *url.URL,
-	opts svnOptions) (err error) {
-	err = execPiped("svn", "checkout", repos.String(), wcPath)
+func svnDiffCommit(ca commitArgs, ga globalArgs) (err error) {
+	err = svnCheckout(ca.Repos, ca.WcPath, ga)
 	if nil != err {
 		return
 	}
-	err = cleanWcRoot(wcPath)
+	err = cleanWcRoot(ca.WcPath)
 	if nil != err {
 		return
 	}
-	err = copyRecursive(srcPath, wcPath)
+	err = copyRecursive(ca.SrcPath, ca.WcPath)
 	if nil != err {
 		return
 	}
-	err = execPiped("svn", "add", wcPath, "--force")
+	err = execPiped("svn", "add", ca.WcPath, "--force")
 	if nil != err {
 		return
 	}
-	out, err := execPrint("svn", "status", wcPath)
+	out, err := execPrint("svn", "status", ca.WcPath)
 	if nil != err {
 		return
 	}
-	statusLines := strings.Split(string(out), "\n")
-	for _, line := range statusLines {
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
 		// svn remove all missing files
-		fmt.Println(line) // TODO: avoid printing an extra line
+		fmt.Println(line)
 	}
-	commitArgs := []string{"commit", wcPath}
-	commitArgs = append(commitArgs, "--message", "hej hej :D")
-	return execPiped("svn", commitArgs...)
+	return svnCommit(ca.WcPath, ca.Message, ga)
 }
 
 func createRepos(reposPath string) (repos *url.URL, err error) {
@@ -222,14 +213,16 @@ func teardownTest(testPath string) {
 func runSelfTest() (err error) {
 	fmt.Print("\n\nSelf test --> Start...\n\n\n")
 	testPath := filepath.Join(".", "self_test")
-	reposUrl, srcPath, err := setupTest(testPath)
+	ca := commitArgs{}
+	ca.Message = "Hellooo :D"
+	ca.WcPath = filepath.Join(testPath, "wc")
+	ca.Repos, ca.SrcPath, err = setupTest(testPath)
 	if nil != err {
 		return
 	}
 	defer teardownTest(testPath)
-	wcPath := filepath.Join(testPath, "wc")
-	var opts svnOptions
-	err = svnDiffCommit(srcPath, wcPath, reposUrl, opts)
+	ga := globalArgs{}
+	err = svnDiffCommit(ca, ga)
 	if nil != err {
 		return
 	}
@@ -237,8 +230,44 @@ func runSelfTest() (err error) {
 	return nil
 }
 
+func parseArgs() (args cmdArgs, err error) {
+	for i, arg := range os.Args {
+		fmt.Println(i, ": ", arg)
+	}
+	return
+}
+
+type globalArgs struct {
+	ConfigDir               *string // --config-dir ARG
+	ConfigOption            *string // --config-options ARG
+	NoAuthCache             bool    // --no-auth-cache
+	NonInteractive          bool    // --non-ineractive
+	Password                *string // --password ARG
+	TrustServerCertFailures *string // --trust-server-cert-failures ARG 'unknown-ca' 'cn-mismatch' 'expired' 'not-yet-valid' 'other'
+	Username                *string // --username ARG
+}
+
+type commitArgs struct {
+	Message string   // --message ARG
+	SrcPath string   // --src-path
+	Repos   *url.URL // --dst-url
+	WcPath  string   // --wc-path
+}
+
+type cmdArgs struct {
+	Help        bool       // --help
+	RunSelfTest bool       // --run-self-test
+	CommitArgs  commitArgs
+	GlobalArgs  globalArgs
+}
+
 func main() {
-	err := runSelfTest()
+	args, err := parseArgs()
+	if nil != err {
+		log.Fatal(err)
+	}
+	fmt.Println(args)
+	err = runSelfTest()
 	if nil != err {
 		log.Fatal(err)
 	}
