@@ -94,7 +94,7 @@ func execPrint(name string, arg ...string) ([]byte, error) {
 
 // TODO: append global svn options if provided
 func svnCheckout(repos *url.URL, wcPath string, ga globalArgs) error {
-	args := []string{ "checkout", repos.String(), wcPath }
+	args := []string{"checkout", repos.String(), wcPath}
 	return execPiped("svn", args...)
 }
 
@@ -255,8 +255,8 @@ type commitArgs struct {
 }
 
 type cmdArgs struct {
-	Help        bool       // --help
-	RunSelfTest bool       // --run-self-test
+	Help        bool // --help
+	RunSelfTest bool // --run-self-test
 	CommitArgs  commitArgs
 	GlobalArgs  globalArgs
 }
