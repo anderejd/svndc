@@ -1,8 +1,9 @@
 package main
 
+import "errors"
 import "fmt"
-import "io/ioutil"
 import "io"
+import "io/ioutil"
 import "log"
 import "net/url"
 import "os"
@@ -104,6 +105,46 @@ func svnCommit(wcPath, message string, ga globalArgs) error {
 	return execPiped("svn", args...)
 }
 
+func svnGetMissing(wcPath string) (missing []string, err error) {
+	out, err := execPrint("svn", "status", wcPath)
+	if nil != err {
+		return
+	}
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if len(line) < 3 {
+			continue
+		}
+		if line[0] != '!' {
+			continue
+		}
+		if ' ' != line[1] && '\t' != line[1] {
+			err = errors.New("Unkown status line: " + line)
+			return
+		}
+		p := strings.TrimSpace(line[1:])
+		missing = append(missing, p)
+	}
+	return
+}
+
+func svnDeleteMissing(wcPath string) (err error) {
+	missing, err := svnGetMissing(wcPath)
+	if nil != err {
+		return
+	}
+	if len(missing) == 0 {
+		return
+	}
+	args := append([]string{"rm"}, missing...)
+	err = execPiped("svn", args...)
+	if nil != err {
+		return
+	}
+	return
+}
+
 func svnDiffCommit(ca commitArgs, ga globalArgs) (err error) {
 	err = svnCheckout(ca.Repos, ca.WcPath, ga)
 	if nil != err {
@@ -121,14 +162,9 @@ func svnDiffCommit(ca commitArgs, ga globalArgs) (err error) {
 	if nil != err {
 		return
 	}
-	out, err := execPrint("svn", "status", ca.WcPath)
+	err = svnDeleteMissing(ca.WcPath)
 	if nil != err {
 		return
-	}
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
-		// svn remove all missing files
-		fmt.Println(line)
 	}
 	return svnCommit(ca.WcPath, ca.Message, ga)
 }
@@ -157,21 +193,34 @@ func makeTestData() []testData {
 	result := []testData{
 		{"1.txt", false, "data1"},
 		{"2.txt", false, "data2"},
-		{"subdir1", true, ""},
-		{filepath.Join("subdir1", "1.txt"), false, "subdata1"},
-		{"subdir2", true, ""}}
+		{"subdir_a", true, ""},
+		{filepath.Join("subdir_a", "3.txt"), false, "data3"},
+		{"subdir_b", true, ""},
+		{filepath.Join("subdir_b", "4.txt"), false, "data4"},
+		{"subdir_c", true, ""}}
 	return result
+}
+
+func removeSomeTestFiles(srcPath string) (err error) {
+	err = os.Remove(filepath.Join(srcPath, "1.txt"))
+	if nil != err {
+		return
+	}
+	err = os.Remove(filepath.Join(srcPath, "subdir_a", "3.txt"))
+	if nil != err {
+		return
+	}
+	return os.RemoveAll(filepath.Join(srcPath, "subdir_b"))
 }
 
 const perm = 0755
 
-func createTestSourceFiles(basePath string) (err error) {
+func crateTestFiles(basePath string, tds []testData) (err error) {
 	err = os.Mkdir(basePath, perm)
 	if nil != err {
 		return
 	}
-	testDatas := makeTestData()
-	for _, td := range testDatas {
+	for _, td := range tds {
 		path := filepath.Join(basePath, td.Path)
 		if td.IsDir {
 			err = os.Mkdir(path, perm)
@@ -194,7 +243,8 @@ func setupTest(testPath string) (repos *url.URL, srcPath string, err error) {
 		return
 	}
 	srcPath = filepath.Join(testPath, "src")
-	err = createTestSourceFiles(srcPath)
+	tds := makeTestData()
+	err = crateTestFiles(srcPath, tds)
 	if nil != err {
 		return
 	}
@@ -226,6 +276,14 @@ func runSelfTest() (err error) {
 	if nil != err {
 		return
 	}
+	err = removeSomeTestFiles(ca.SrcPath)
+	if nil != err {
+		return
+	}
+	err = svnDiffCommit(ca, ga)
+	if nil != err {
+		return
+	}
 	fmt.Print("\n\nSelf test --> Success.\n\n\n")
 	return nil
 }
@@ -234,6 +292,7 @@ func parseArgs() (args cmdArgs, err error) {
 	for i, arg := range os.Args {
 		fmt.Println(i, ": ", arg)
 	}
+	args.RunSelfTest = true
 	return
 }
 
@@ -248,10 +307,11 @@ type globalArgs struct {
 }
 
 type commitArgs struct {
-	Message string   // --message ARG
-	SrcPath string   // --src-path
-	Repos   *url.URL // --dst-url
-	WcPath  string   // --wc-path
+	Message  string   // --message ARG
+	SrcPath  string   // --src-path ARG
+	Repos    *url.URL // --dst-url ARG
+	WcPath   string   // --wc-path ARG
+	WcDelete bool     // --wc-delete
 }
 
 type cmdArgs struct {
@@ -266,8 +326,11 @@ func main() {
 	if nil != err {
 		log.Fatal(err)
 	}
-	fmt.Println(args)
-	err = runSelfTest()
+	if args.RunSelfTest {
+		err = runSelfTest()
+	} else if args.Help {
+		// print usage
+	}
 	if nil != err {
 		log.Fatal(err)
 	}
