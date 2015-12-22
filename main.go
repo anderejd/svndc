@@ -221,20 +221,20 @@ func crateTestFiles(basePath string, tds []testData) (err error) {
 		return
 	}
 	for _, td := range tds {
-		path := filepath.Join(basePath, td.Path)
-		if td.IsDir {
-			err = os.Mkdir(path, perm)
-			if nil != err {
-				return
-			}
-			continue
-		}
-		err = ioutil.WriteFile(path, []byte(td.Content), perm)
+		err = createTestFile(td, basePath)
 		if nil != err {
 			return
 		}
 	}
 	return nil
+}
+
+func createTestFile(td testData, basePath string) error {
+	path := filepath.Join(basePath, td.Path)
+	if td.IsDir {
+		return os.Mkdir(path, perm)
+	}
+	return ioutil.WriteFile(path, []byte(td.Content), perm)
 }
 
 func setupTest(testPath string) (repos *url.URL, srcPath string, err error) {
