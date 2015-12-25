@@ -12,8 +12,7 @@ import "path/filepath"
 import "reflect"
 import "strings"
 
-const help =
-`--help           Print syntax help
+const help = `--help           Print syntax help
 --run-self-test  Requires svnadmin. Will create a local repository in 
                  the directory ./self_test/repos and use for tests. The
                  directory ./self will be deleted when tests complete.
@@ -355,7 +354,7 @@ func getArgMap(args []string) (am argMap, err error) {
 }
 
 // TODO: Figure out how to support more types, specifically url.URL in a clean way
-func parseArgs(src []string, out interface {}) (err error) {
+func parseArgs(src []string, out interface{}) (err error) {
 	am, err := getArgMap(src[1:])
 	if nil != err {
 		return
@@ -441,11 +440,11 @@ type globalArgs struct {
 }
 
 type commitArgs struct {
-	Message  string  `cmd:"--message"`
-	SrcPath  string  `cmd:"--src-path"`
-	Repos    string  `cmd:"--dst-url"`
-	WcPath   string  `cmd:"--wc-path"`
-	WcDelete bool    `cmd:"--wc-delete"`
+	Message  string `cmd:"--message"`
+	SrcPath  string `cmd:"--src-path"`
+	Repos    string `cmd:"--dst-url"`
+	WcPath   string `cmd:"--wc-path"`
+	WcDelete bool   `cmd:"--wc-delete"`
 }
 
 type cmdArgs struct {
