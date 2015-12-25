@@ -11,6 +11,31 @@ import "os/exec"
 import "path/filepath"
 import "strings"
 
+const help =
+`--help           Print syntax help
+--run-self-test  Requires svnadmin. Will create a local repository in 
+                 the directory ./self_test/repos and use for tests. The
+                 directory ./self will be deleted when tests complete.
+--src-path       Path to directory with files to commit
+--dst-url        Target SVN repository URL (commit destination)
+--wc-path        Working copy path. This path will be created by svn
+                 checkout, if it does not exist. Files from --src-path 
+                 will be copied here. Files not present in --src-path
+                 will be svn-deleted in --wc-path.
+--wc-delete      Will delete --wc-path after svn commit.
+--message        Message for svn commit.
+
+SVN Global args (see svn documentaion):
+
+--config-dir ARG
+--config-options ARG
+--no-auth-cache
+--non-ineractive
+--password ARG
+--trust-server-cert-failures ARG
+--username ARG
+`
+
 func cleanWcRoot(wcPath string) (err error) {
 	infos, err := ioutil.ReadDir(wcPath)
 	if nil != err {
@@ -289,7 +314,11 @@ func runSelfTest() (err error) {
 }
 
 func parseArgs() (args cmdArgs, err error) {
-	for i, arg := range os.Args {
+	if len(os.Args) < 2 {
+		args.Help = true
+		return
+	}
+	for i, arg := range os.Args[1:] {
 		fmt.Println(i, ": ", arg)
 	}
 	args.RunSelfTest = true
@@ -321,15 +350,22 @@ type cmdArgs struct {
 	GlobalArgs  globalArgs
 }
 
+func printUsage() {
+	fmt.Println(help)
+}
+
 func main() {
 	args, err := parseArgs()
 	if nil != err {
+		printUsage()
 		log.Fatal(err)
+	}
+	if args.Help {
+		printUsage()
+		return
 	}
 	if args.RunSelfTest {
 		err = runSelfTest()
-	} else if args.Help {
-		// print usage
 	}
 	if nil != err {
 		log.Fatal(err)
