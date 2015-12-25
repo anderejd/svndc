@@ -9,6 +9,7 @@ import "net/url"
 import "os"
 import "os/exec"
 import "path/filepath"
+import "reflect"
 import "strings"
 
 const help =
@@ -119,7 +120,7 @@ func execPrint(name string, arg ...string) ([]byte, error) {
 }
 
 // TODO: append global svn options if provided
-func svnCheckout(repos *url.URL, wcPath string, ga globalArgs) error {
+func svnCheckout(repos url.URL, wcPath string, ga globalArgs) error {
 	args := []string{"checkout", repos.String(), wcPath}
 	return execPiped("svn", args...)
 }
@@ -145,7 +146,7 @@ func svnGetMissing(wcPath string) (missing []string, err error) {
 			continue
 		}
 		if ' ' != line[1] && '\t' != line[1] {
-			err = errors.New("Unkown status line: " + line)
+			err = errors.New("Unknown status line: " + line)
 			return
 		}
 		p := strings.TrimSpace(line[1:])
@@ -171,7 +172,11 @@ func svnDeleteMissing(wcPath string) (err error) {
 }
 
 func svnDiffCommit(ca commitArgs, ga globalArgs) (err error) {
-	err = svnCheckout(ca.Repos, ca.WcPath, ga)
+	repos, err := url.Parse(ca.Repos)
+	if nil != err {
+		return
+	}
+	err = svnCheckout(*repos, ca.WcPath, ga)
 	if nil != err {
 		return
 	}
@@ -194,7 +199,7 @@ func svnDiffCommit(ca commitArgs, ga globalArgs) (err error) {
 	return svnCommit(ca.WcPath, ca.Message, ga)
 }
 
-func createRepos(reposPath string) (repos *url.URL, err error) {
+func createRepos(reposPath string) (reposUrl string, err error) {
 	err = execPiped("svnadmin", "create", reposPath)
 	if nil != err {
 		return
@@ -204,7 +209,11 @@ func createRepos(reposPath string) (repos *url.URL, err error) {
 		return
 	}
 	absReposPath = "file://" + absReposPath
-	repos, err = url.Parse(absReposPath)
+	repos, err := url.Parse(absReposPath)
+	if nil != err {
+		return
+	}
+	reposUrl = repos.String()
 	return
 }
 
@@ -262,7 +271,7 @@ func createTestFile(td testData, basePath string) error {
 	return ioutil.WriteFile(path, []byte(td.Content), perm)
 }
 
-func setupTest(testPath string) (repos *url.URL, srcPath string, err error) {
+func setupTest(testPath string) (reposUrl string, srcPath string, err error) {
 	err = os.Mkdir(testPath, perm)
 	if nil != err {
 		return
@@ -274,7 +283,7 @@ func setupTest(testPath string) (repos *url.URL, srcPath string, err error) {
 		return
 	}
 	reposPath := filepath.Join(testPath, "repos")
-	repos, err = createRepos(reposPath)
+	reposUrl, err = createRepos(reposPath)
 	return
 }
 
@@ -313,49 +322,154 @@ func runSelfTest() (err error) {
 	return nil
 }
 
-func parseArgs() (args cmdArgs, err error) {
-	if len(os.Args) < 2 {
-		args.Help = true
-		return
+type argMap map[string]*string
+
+// Allows keys with nil values.
+// Disallow multiple values for a single key.
+func getArgMap(args []string) (am argMap, err error) {
+	key := ""
+	am = argMap{}
+	for _, arg := range args {
+		clean := strings.TrimSpace(arg)
+		if strings.HasPrefix(clean, "--") {
+			key = clean
+			_, hasKey := am[key]
+			if !hasKey {
+				am[key] = nil
+				continue
+			}
+			err = errors.New("Duplicate keys: " + key)
+			return
+		}
+		if "" == key {
+			err = errors.New("Expected key (--), found: " + clean)
+			return
+		}
+		v := am[key]
+		if nil != v {
+			err = errors.New("Expected single value for: " + key)
+		}
+		am[key] = &clean // TODO: Investigate, why does this work? Pointer escape analysis?
 	}
-	for i, arg := range os.Args[1:] {
-		fmt.Println(i, ": ", arg)
-	}
-	args.RunSelfTest = true
 	return
 }
 
+// TODO: Figure out how to support more types, specifically url.URL in a clean way
+func parseArgs(src []string, out interface {}) (err error) {
+	am, err := getArgMap(src[1:])
+	if nil != err {
+		return
+	}
+	fm, err := buildFieldMap(reflect.TypeOf(out).Elem(), "cmd")
+	if nil != err {
+		return
+	}
+	rv := reflect.ValueOf(out).Elem()
+	for k, v := range am {
+		fieldIndex, hasKey := fm[k]
+		if !hasKey {
+			err = errors.New("Unknown option: " + k)
+			return
+		}
+		field := rv.FieldByIndex(fieldIndex)
+		if reflect.Bool == field.Type().Kind() {
+			if nil != v {
+				err = errors.New("Syntax error: " + k + " " + *v)
+				return
+			}
+			rv.FieldByIndex(fieldIndex).SetBool(true)
+			continue
+		}
+		if nil == v {
+			err = errors.New("Value missing for key: " + k)
+		}
+		fmt.Println(k, ", ", *v)
+		field.Set(reflect.ValueOf(*v))
+	}
+	return
+}
+
+type fieldIndex []int
+type fieldMap map[string]fieldIndex
+
+func (m fieldMap) Append(t reflect.Type, index []int, tagName string) error {
+	numf := t.NumField()
+	for i := 0; i < numf; i++ {
+		field := t.Field(i)
+		fieldIndex := append(index, i)
+		if field.Type.Kind() == reflect.Struct && field.Anonymous { // only traverse into embedded structs
+			err := m.Append(field.Type, fieldIndex, tagName)
+			if nil != err {
+				return err
+			}
+			continue
+		}
+		name, err := getFieldName(field, tagName)
+		if nil != err {
+			return err
+		}
+		m[name] = fieldIndex
+	}
+	return nil
+}
+
+func getFieldName(sf reflect.StructField, tagName string) (name string, err error) {
+	name = sf.Tag.Get(tagName)
+	if "" == name {
+		sfstr := fmt.Sprintf("%#v", sf)
+		err = errors.New("getArgName failed for: " + sfstr)
+		return
+	}
+	return
+}
+
+func buildFieldMap(t reflect.Type, tagName string) (fm fieldMap, err error) {
+	fm = fieldMap{}
+	index := []int{}
+	err = fm.Append(t, index, tagName)
+	return fm, err
+}
+
 type globalArgs struct {
-	ConfigDir               *string // --config-dir ARG
-	ConfigOption            *string // --config-options ARG
-	NoAuthCache             bool    // --no-auth-cache
-	NonInteractive          bool    // --non-ineractive
-	Password                *string // --password ARG
-	TrustServerCertFailures *string // --trust-server-cert-failures ARG 'unknown-ca' 'cn-mismatch' 'expired' 'not-yet-valid' 'other'
-	Username                *string // --username ARG
+	ConfigDir               string `cmd:"--config-dir"`
+	ConfigOption            string `cmd:"--config-options"`
+	NoAuthCache             bool   `cmd:"--no-auth-cache"`
+	NonInteractive          bool   `cmd:"--non-ineractive"`
+	Password                string `cmd:"--password"`
+	TrustServerCertFailures string `cmd:"--trust-server-cert-failures"`
+	Username                string `cmd:"--username"`
 }
 
 type commitArgs struct {
-	Message  string   // --message ARG
-	SrcPath  string   // --src-path ARG
-	Repos    *url.URL // --dst-url ARG
-	WcPath   string   // --wc-path ARG
-	WcDelete bool     // --wc-delete
+	Message  string  `cmd:"--message"`
+	SrcPath  string  `cmd:"--src-path"`
+	Repos    string  `cmd:"--dst-url"`
+	WcPath   string  `cmd:"--wc-path"`
+	WcDelete bool    `cmd:"--wc-delete"`
 }
 
 type cmdArgs struct {
-	Help        bool // --help
-	RunSelfTest bool // --run-self-test
-	CommitArgs  commitArgs
-	GlobalArgs  globalArgs
+	Help        bool `cmd:"--help"`
+	RunSelfTest bool `cmd:"--run-self-test"`
+	commitArgs
+	globalArgs
 }
 
 func printUsage() {
 	fmt.Println(help)
 }
 
+func parseOsArgs() (args cmdArgs, err error) {
+	if len(os.Args) < 2 {
+		args.Help = true
+		return
+	}
+	err = parseArgs(os.Args, &args)
+	return
+}
+
 func main() {
-	args, err := parseArgs()
+	args, err := parseOsArgs()
 	if nil != err {
 		printUsage()
 		log.Fatal(err)
