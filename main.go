@@ -118,9 +118,13 @@ func execPrint(name string, arg ...string) ([]byte, error) {
 	return exec.Command(name, arg...).Output()
 }
 
-// TODO: append global svn options if provided
+func appendGlobalArgs(args []string, ga globalArgs) []string {
+	//TODO: iterate over fields
+}
+
 func svnCheckout(repos url.URL, wcPath string, ga globalArgs) error {
 	args := []string{"checkout", repos.String(), wcPath}
+	args = appendGlobalArgs(args, ga)
 	return execPiped("svn", args...)
 }
 
@@ -353,7 +357,8 @@ func getArgMap(args []string) (am argMap, err error) {
 	return
 }
 
-// TODO: Figure out how to support more types, specifically url.URL in a clean way
+// TODO: Figure out how to support more types, specifically url.URL in a clean way.
+//       String pointers too.
 func parseArgs(src []string, out interface{}) (err error) {
 	am, err := getArgMap(src[1:])
 	if nil != err {
@@ -479,6 +484,10 @@ func main() {
 	}
 	if args.RunSelfTest {
 		err = runSelfTest()
+	}
+	err = svnDiffCommit(args.commitArgs, args.globalArgs)
+	if nil != err {
+		return
 	}
 	if nil != err {
 		log.Fatal(err)
