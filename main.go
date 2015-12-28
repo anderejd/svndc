@@ -13,17 +13,17 @@ import "reflect"
 import "strings"
 
 const help = `--help           Print syntax help
---run-self-test  Requires svnadmin. Will create a local repository in 
-                 the directory ./self_test/repos and use for tests. The
-                 directory ./self will be deleted when tests complete.
 --src-path       Path to directory with files to commit
---dst-url        Target SVN repository URL (commit destination)
+--repos-url      Target SVN repository URL (commit destination)
 --wc-path        Working copy path. This path will be created by svn
                  checkout, if it does not exist. Files from --src-path 
                  will be copied here. Files not present in --src-path
                  will be svn-deleted in --wc-path.
 --wc-delete      Will delete --wc-path after svn commit.
 --message        Message for svn commit.
+--self-test      Requires svnadmin. Will create a local repository in 
+                 the directory ./self_test/repos and use for tests. The
+                 directory ./self will be deleted when tests complete.
 
 SVN Global args (see svn documentaion):
 
@@ -55,7 +55,6 @@ func cleanWcRoot(wcPath string) (err error) {
 }
 
 func execPiped(name string, arg ...string) error {
-	fmt.Println(name + " " + strings.Join(arg, " "))
 	cmd := exec.Command(name, arg...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -113,14 +112,10 @@ func copyRecursive(srcDir, dstDir string) (err error) {
 	return nil
 }
 
-func execPrint(name string, arg ...string) ([]byte, error) {
-	fmt.Println(name + " " + strings.Join(arg, " "))
-	return exec.Command(name, arg...).Output()
-}
 
 func makeArgs(o interface {}) (out []string, err error) {
-	t := reflect.TypeOf(o).Elem()
-	v := reflect.ValueOf(o).Elem()
+	t := reflect.TypeOf(o)
+	v := reflect.ValueOf(o)
 	numf := t.NumField()
 	for i := 0; i < numf; i++ {
 		field := t.Field(i)
@@ -181,7 +176,7 @@ func svnCommit(wcPath, message string, ga globalArgs) (err error) {
 }
 
 func svnGetMissing(wcPath string) (missing []string, err error) {
-	out, err := execPrint("svn", "status", wcPath)
+	out, err := exec.Command("svn", "status", wcPath).Output()
 	if nil != err {
 		return
 	}
@@ -220,8 +215,27 @@ func svnDeleteMissing(wcPath string) (err error) {
 	return
 }
 
+// FIXME: Duplication of code (--argnames)
+func checkCommitArgs(ca commitArgs) error {
+	m := "Missing flag "
+	if "" == ca.SrcPath {
+		return errors.New(m + "--src-path.")
+	}
+	if "" == ca.ReposUrl {
+		return errors.New(m + "--repos-url.")
+	}
+	if "" == ca.WcPath {
+		return errors.New(m + "--wc-path.")
+	}
+	return nil
+}
+
 func svnDiffCommit(ca commitArgs, ga globalArgs) (err error) {
-	repos, err := url.Parse(ca.Repos)
+	err = checkCommitArgs(ca)
+	if nil != err {
+		return
+	}
+	repos, err := url.Parse(ca.ReposUrl)
 	if nil != err {
 		return
 	}
@@ -349,7 +363,7 @@ func runSelfTest() (err error) {
 	ca := commitArgs{}
 	ca.Message = "Hellooo :D"
 	ca.WcPath = filepath.Join(testPath, "wc")
-	ca.Repos, ca.SrcPath, err = setupTest(testPath)
+	ca.ReposUrl, ca.SrcPath, err = setupTest(testPath)
 	if nil != err {
 		return
 	}
@@ -497,14 +511,14 @@ type globalArgs struct {
 type commitArgs struct {
 	Message  string `cmd:"--message"`
 	SrcPath  string `cmd:"--src-path"`
-	Repos    string `cmd:"--dst-url"`
+	ReposUrl string `cmd:"--repos-url"`
 	WcPath   string `cmd:"--wc-path"`
 	WcDelete bool   `cmd:"--wc-delete"`
 }
 
 type cmdArgs struct {
 	Help        bool `cmd:"--help"`
-	RunSelfTest bool `cmd:"--run-self-test"`
+	RunSelfTest bool `cmd:"--self-test"`
 	commitArgs
 	globalArgs
 }
@@ -534,10 +548,11 @@ func main() {
 	}
 	if args.RunSelfTest {
 		err = runSelfTest()
+		return
 	}
 	err = svnDiffCommit(args.commitArgs, args.globalArgs)
 	if nil != err {
-		return
+		log.Fatal(err)
 	}
 	if nil != err {
 		log.Fatal(err)
