@@ -118,19 +118,65 @@ func execPrint(name string, arg ...string) ([]byte, error) {
 	return exec.Command(name, arg...).Output()
 }
 
-func appendGlobalArgs(args []string, ga globalArgs) []string {
-	//TODO: iterate over fields
+func makeArgs(o interface {}) (out []string, err error) {
+	t := reflect.TypeOf(o).Elem()
+	v := reflect.ValueOf(o).Elem()
+	numf := t.NumField()
+	for i := 0; i < numf; i++ {
+		field := t.Field(i)
+		var name string
+		name, err = getFieldName(field, "cmd")
+		if nil != err {
+			return
+		}
+		kind := field.Type.Kind()
+		valField := v.Field(i)
+		switch kind {
+			case reflect.Bool:
+				if false == valField.Bool() {
+					continue
+				}
+				out = append(out, name)
+				break
+			case reflect.String:
+				val := valField.String()
+				if "" == val {
+					continue
+				}
+				out = append(out, name, valField.String())
+				break
+			default:
+				err = errors.New("Unsupported type: " + string(kind))
+				return out, err
+		}
+	}
+	return out, nil
 }
 
-func svnCheckout(repos url.URL, wcPath string, ga globalArgs) error {
+func appendGlobalArgs(in []string, ga globalArgs) (out []string, err error) {
+	args, err := makeArgs(ga)
+	if nil != err {
+		return
+	}
+	out = append(in, args...)
+	return
+}
+
+func svnCheckout(repos url.URL, wcPath string, ga globalArgs) (err error) {
 	args := []string{"checkout", repos.String(), wcPath}
-	args = appendGlobalArgs(args, ga)
+	args, err = appendGlobalArgs(args, ga)
+	if nil != err {
+		return
+	}
 	return execPiped("svn", args...)
 }
 
-// TODO: append global svn options if provided
-func svnCommit(wcPath, message string, ga globalArgs) error {
+func svnCommit(wcPath, message string, ga globalArgs) (err error) {
 	args := []string{"commit", wcPath, "--message", message}
+	args, err = appendGlobalArgs(args, ga)
+	if nil != err {
+		return
+	}
 	return execPiped("svn", args...)
 }
 
@@ -357,8 +403,11 @@ func getArgMap(args []string) (am argMap, err error) {
 	return
 }
 
-// TODO: Figure out how to support more types, specifically url.URL in a clean way.
-//       String pointers too.
+// TODO: 1. Figure out how to support more types, specifically url.URL in a clean way.
+//          String pointers too.
+//       1.1 add pointer to string support for clean null values
+//       2. Move to package and cleanup.
+//       3. Add validation layer
 func parseArgs(src []string, out interface{}) (err error) {
 	am, err := getArgMap(src[1:])
 	if nil != err {
@@ -376,7 +425,8 @@ func parseArgs(src []string, out interface{}) (err error) {
 			return
 		}
 		field := rv.FieldByIndex(fieldIndex)
-		if reflect.Bool == field.Type().Kind() {
+		kind := field.Type().Kind()
+		if reflect.Bool == kind {
 			if nil != v {
 				err = errors.New("Syntax error: " + k + " " + *v)
 				return
@@ -387,7 +437,6 @@ func parseArgs(src []string, out interface{}) (err error) {
 		if nil == v {
 			err = errors.New("Value missing for key: " + k)
 		}
-		fmt.Println(k, ", ", *v)
 		field.Set(reflect.ValueOf(*v))
 	}
 	return
@@ -427,6 +476,7 @@ func getFieldName(sf reflect.StructField, tagName string) (name string, err erro
 	return
 }
 
+// Hide in Marshaller/Unmarshaller context avoid rebuilding the map.
 func buildFieldMap(t reflect.Type, tagName string) (fm fieldMap, err error) {
 	fm = fieldMap{}
 	index := []int{}
