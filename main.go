@@ -40,6 +40,31 @@ SVN Global args (see svn documentaion):
 --username ARG
 `
 
+type cmdArgs struct {
+	Help        bool `cmd:"--help"`
+	RunSelfTest bool `cmd:"--self-test"`
+	commitArgs
+	globalArgs
+}
+
+type commitArgs struct {
+	Message  string `cmd:"--message"`
+	ReposUrl string `cmd:"--repos"`
+	SrcPath  string `cmd:"--src"`
+	WcDelete bool   `cmd:"--wc-delete"`
+	WcPath   string `cmd:"--wc"`
+}
+
+type globalArgs struct {
+	ConfigDir               string `cmd:"--config-dir"`
+	ConfigOption            string `cmd:"--config-options"`
+	NoAuthCache             bool   `cmd:"--no-auth-cache"`
+	NonInteractive          bool   `cmd:"--non-ineractive"`
+	Password                string `cmd:"--password"`
+	TrustServerCertFailures string `cmd:"--trust-server-cert-failures"`
+	Username                string `cmd:"--username"`
+}
+
 func cleanWcRoot(wcPath string) (err error) {
 	infos, err := ioutil.ReadDir(wcPath)
 	if nil != err {
@@ -280,7 +305,7 @@ func removeSomeTestFiles(srcPath string) (err error) {
 
 const perm = 0755
 
-func crateTestFiles(basePath string, tds []testData) (err error) {
+func createTestFiles(basePath string, tds []testData) (err error) {
 	err = os.Mkdir(basePath, perm)
 	if nil != err {
 		return
@@ -309,7 +334,7 @@ func setupTest(testPath string) (reposUrl string, srcPath string, err error) {
 	}
 	srcPath = filepath.Join(testPath, "src")
 	tds := makeTestData()
-	err = crateTestFiles(srcPath, tds)
+	err = createTestFiles(srcPath, tds)
 	if nil != err {
 		return
 	}
@@ -351,31 +376,6 @@ func runSelfTest() (err error) {
 	}
 	fmt.Print("\n\nSelf test --> Success.\n\n\n")
 	return nil
-}
-
-type globalArgs struct {
-	ConfigDir               string `cmd:"--config-dir"`
-	ConfigOption            string `cmd:"--config-options"`
-	NoAuthCache             bool   `cmd:"--no-auth-cache"`
-	NonInteractive          bool   `cmd:"--non-ineractive"`
-	Password                string `cmd:"--password"`
-	TrustServerCertFailures string `cmd:"--trust-server-cert-failures"`
-	Username                string `cmd:"--username"`
-}
-
-type commitArgs struct {
-	Message  string `cmd:"--message"`
-	ReposUrl string `cmd:"--repos"`
-	SrcPath  string `cmd:"--src"`
-	WcDelete bool   `cmd:"--wc-delete"`
-	WcPath   string `cmd:"--wc"`
-}
-
-type cmdArgs struct {
-	Help        bool `cmd:"--help"`
-	RunSelfTest bool `cmd:"--self-test"`
-	commitArgs
-	globalArgs
 }
 
 func printUsage() {
