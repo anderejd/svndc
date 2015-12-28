@@ -14,20 +14,20 @@ import "strings"
 
 const help = `github.com/rajder/svndc (Subversion Diff Commit)
 usage:
-svndc --src-path PATH --repos-path URL --wc-path PATH --message "There are only 12 cylon models." --username GBaltar --password 123Caprica ...
+svndc --src PATH --repos URL --wc PATH --message "There are only 12 cylon models." --username GBaltar --password 123Caprica ...
 
---help           Print syntax help
---src-path       Path to directory with files to commit
---repos-url      Target SVN repository URL (commit destination)
---wc-path        Working copy path. This path will be created by svn
-                 checkout, if it does not exist. Files from --src-path 
-                 will be copied here. Files not present in --src-path
-                 will be svn-deleted in --wc-path.
---wc-delete      Will delete --wc-path after svn commit.
---message        Message for svn commit.
---self-test      Requires svnadmin. Will create a local repository in 
-                 the directory ./self_test/repos and use for tests. The
-                 directory ./self will be deleted when tests complete.
+--help       Print syntax help
+--src        Path to directory with files to commit
+--repos      Target SVN repository URL (commit destination)
+--wc         Working copy path. This path will be created by svn
+             checkout, if it does not exist. Files from --src-path 
+             will be copied here. Files not present in --src-path
+             will be svn-deleted in --wc-path.
+--wc-delete  Will delete --wc-path after svn commit.
+--message    Message for svn commit.
+--self-test  Requires svnadmin. Will create a local repository in 
+             the directory ./self_test/repos and use for tests. The
+             directory ./self will be deleted when tests complete.
 
 SVN Global args (see svn documentaion):
 
@@ -365,10 +365,10 @@ type globalArgs struct {
 
 type commitArgs struct {
 	Message  string `cmd:"--message"`
-	SrcPath  string `cmd:"--src-path"`
-	ReposUrl string `cmd:"--repos-url"`
-	WcPath   string `cmd:"--wc-path"`
+	ReposUrl string `cmd:"--repos"`
+	SrcPath  string `cmd:"--src"`
 	WcDelete bool   `cmd:"--wc-delete"`
+	WcPath   string `cmd:"--wc"`
 }
 
 type cmdArgs struct {
