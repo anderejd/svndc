@@ -77,7 +77,7 @@ func ParseArgs(src []string, out interface{}) (err error) {
 	return
 }
 
-func MakeArgs(o interface {}) (out []string, err error) {
+func MakeArgs(o interface{}) (out []string, err error) {
 	t := reflect.TypeOf(o)
 	v := reflect.ValueOf(o)
 	numf := t.NumField()
@@ -91,27 +91,26 @@ func MakeArgs(o interface {}) (out []string, err error) {
 		kind := field.Type.Kind()
 		valField := v.Field(i)
 		switch kind {
-			case reflect.Bool:
-				if false == valField.Bool() {
-					continue
-				}
-				out = append(out, name)
-				break
-			case reflect.String:
-				val := valField.String()
-				if "" == val {
-					continue
-				}
-				out = append(out, name, valField.String())
-				break
-			default:
-				err = errors.New("Unsupported type: " + string(kind))
-				return out, err
+		case reflect.Bool:
+			if false == valField.Bool() {
+				continue
+			}
+			out = append(out, name)
+			break
+		case reflect.String:
+			val := valField.String()
+			if "" == val {
+				continue
+			}
+			out = append(out, name, valField.String())
+			break
+		default:
+			err = errors.New("Unsupported type: " + string(kind))
+			return out, err
 		}
 	}
 	return out, nil
 }
-
 
 func (m fieldMap) add(t reflect.Type, index []int, tagName string) error {
 	numf := t.NumField()
@@ -151,4 +150,3 @@ func buildFieldMap(t reflect.Type, tagName string) (fm fieldMap, err error) {
 	err = fm.add(t, index, tagName)
 	return fm, err
 }
-
