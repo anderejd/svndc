@@ -23,7 +23,7 @@ svndc --src PATH --repos URL --wc PATH --message "There are only 12 cylon models
              checkout, if it does not exist. Files from --src-path 
              will be copied here. Files not present in --src-path
              will be svn-deleted in --wc-path.
---wc-delete  Will delete --wc-path after svn commit.
+--wc-delete  Will delete --wc path after svn commit.
 --message    Message for svn commit.
 --self-test  Requires svnadmin. Will create a local repository in 
              the directory ./self_test/repos and use for tests. The
