@@ -252,7 +252,14 @@ func svnDiffCommit(ca commitArgs, ga globalArgs) (err error) {
 	if nil != err {
 		return
 	}
-	return svnCommit(ca.WcPath, ca.Message, ga)
+	err = svnCommit(ca.WcPath, ca.Message, ga)
+	if nil != err {
+		return
+	}
+	if !ca.WcDelete {
+		return
+	}
+	return os.RemoveAll(ca.WcPath)
 }
 
 func createRepos(reposPath string) (reposUrl string, err error) {
