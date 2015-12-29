@@ -3,6 +3,7 @@ package main
 import "errors"
 import "fmt"
 import "github.com/rajder/svndc/cmdflags"
+import "github.com/rajder/svndc/osfix"
 import "io"
 import "io/ioutil"
 import "log"
@@ -75,7 +76,7 @@ func cleanWcRoot(wcPath string) (err error) {
 			continue
 		}
 		fullPath := filepath.Join(wcPath, inf.Name())
-		err = os.RemoveAll(fullPath)
+		err = osfix.RemoveAll(fullPath)
 		if nil != err {
 			return
 		}
@@ -150,8 +151,8 @@ func appendGlobalArgs(in []string, ga globalArgs) (out []string, err error) {
 	return
 }
 
-func svnCheckout(repos url.URL, wcPath string, ga globalArgs) (err error) {
-	args := []string{"checkout", repos.String(), wcPath}
+func svnCheckout(reposUrl, wcPath string, ga globalArgs) (err error) {
+	args := []string{"checkout", reposUrl, wcPath}
 	args, err = appendGlobalArgs(args, ga)
 	if nil != err {
 		return
@@ -228,11 +229,7 @@ func svnDiffCommit(ca commitArgs, ga globalArgs) (err error) {
 	if nil != err {
 		return
 	}
-	repos, err := url.Parse(ca.ReposUrl)
-	if nil != err {
-		return
-	}
-	err = svnCheckout(*repos, ca.WcPath, ga)
+	err = svnCheckout(ca.ReposUrl, ca.WcPath, ga)
 	if nil != err {
 		return
 	}
@@ -259,7 +256,7 @@ func svnDiffCommit(ca commitArgs, ga globalArgs) (err error) {
 	if !ca.WcDelete {
 		return
 	}
-	return os.RemoveAll(ca.WcPath)
+	return osfix.RemoveAll(ca.WcPath)
 }
 
 func createRepos(reposPath string) (reposUrl string, err error) {
@@ -271,7 +268,8 @@ func createRepos(reposPath string) (reposUrl string, err error) {
 	if nil != err {
 		return
 	}
-	absReposPath = "file://" + absReposPath
+	absReposPath = strings.TrimPrefix(absReposPath, "/")
+	absReposPath = "file:///" + absReposPath
 	repos, err := url.Parse(absReposPath)
 	if nil != err {
 		return
@@ -307,7 +305,7 @@ func removeSomeTestFiles(srcPath string) (err error) {
 	if nil != err {
 		return
 	}
-	return os.RemoveAll(filepath.Join(srcPath, "subdir_b"))
+	return osfix.RemoveAll(filepath.Join(srcPath, "subdir_b"))
 }
 
 const perm = 0755
@@ -351,7 +349,7 @@ func setupTest(testPath string) (reposUrl string, srcPath string, err error) {
 }
 
 func teardownTest(testPath string) {
-	err := os.RemoveAll(testPath)
+	err := osfix.RemoveAll(testPath)
 	if nil != err {
 		log.Println("ERROR: ", err)
 	}
@@ -410,6 +408,9 @@ func main() {
 	}
 	if args.RunSelfTest {
 		err = runSelfTest()
+		if nil != err {
+			log.Fatal(err)
+		}
 		return
 	}
 	err = svnDiffCommit(args.commitArgs, args.globalArgs)
