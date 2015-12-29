@@ -16,9 +16,9 @@ The following steps are automated:
 All global SVN options are passed through to the svn subprocess.
 
 ```
+github.com/rajder/svndc (Subversion Diff Commit)
 usage:
 svndc --src PATH --repos URL --wc PATH --message "There are only 12 cylon models." --username GBaltar --password 123Caprica ...
-
 --help       Print syntax help
 --src        Path to directory with files to commit
 --repos      Target SVN repository URL (commit destination)
@@ -26,14 +26,12 @@ svndc --src PATH --repos URL --wc PATH --message "There are only 12 cylon models
              checkout, if it does not exist. Files from --src-path 
              will be copied here. Files not present in --src-path
              will be svn-deleted in --wc-path.
---wc-delete  Will delete --wc-path after svn commit.
+--wc-delete  Will delete --wc path after svn commit.
 --message    Message for svn commit.
 --self-test  Requires svnadmin. Will create a local repository in 
              the directory ./self_test/repos and use for tests. The
-             directory ./self will be deleted when tests complete.
-
+             directory ./self_test will be deleted when tests complete.
 SVN Global args (see svn documentaion):
-
 --config-dir ARG
 --config-options ARG
 --no-auth-cache
