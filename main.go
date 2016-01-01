@@ -44,6 +44,7 @@ SVN Global args (see svn documentaion):
 type cmdArgs struct {
 	Help        bool `cmd:"--help"`
 	RunSelfTest bool `cmd:"--self-test"`
+	DebugLog    bool `cmd:"--debug"`
 	commitArgs
 	globalArgs
 }
@@ -84,7 +85,8 @@ func cleanWcRoot(wcPath string) (err error) {
 	return nil
 }
 
-func execPiped(name string, arg ...string) error {
+func execPiped(l Logger, name string, arg ...string) error {
+	l.Dbg("execPiped: ", name, arg)
 	cmd := exec.Command(name, arg...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -151,22 +153,22 @@ func appendGlobalArgs(in []string, ga globalArgs) (out []string, err error) {
 	return
 }
 
-func svnCheckout(reposUrl, wcPath string, ga globalArgs) (err error) {
+func svnCheckout(reposUrl, wcPath string, ga globalArgs, l Logger) (err error) {
 	args := []string{"checkout", reposUrl, wcPath}
 	args, err = appendGlobalArgs(args, ga)
 	if nil != err {
 		return
 	}
-	return execPiped("svn", args...)
+	return execPiped(l, "svn", args...)
 }
 
-func svnCommit(wcPath, message string, ga globalArgs) (err error) {
+func svnCommit(wcPath, message string, ga globalArgs, l Logger) (err error) {
 	args := []string{"commit", wcPath, "--message", message}
 	args, err = appendGlobalArgs(args, ga)
 	if nil != err {
 		return
 	}
-	return execPiped("svn", args...)
+	return execPiped(l, "svn", args...)
 }
 
 func svnGetMissing(wcPath string) (missing []string, err error) {
@@ -193,7 +195,7 @@ func svnGetMissing(wcPath string) (missing []string, err error) {
 	return
 }
 
-func svnDeleteMissing(wcPath string) (err error) {
+func svnDeleteMissing(wcPath string, l Logger) (err error) {
 	missing, err := svnGetMissing(wcPath)
 	if nil != err {
 		return
@@ -202,7 +204,7 @@ func svnDeleteMissing(wcPath string) (err error) {
 		return
 	}
 	args := append([]string{"rm"}, missing...)
-	err = execPiped("svn", args...)
+	err = execPiped(l, "svn", args...)
 	if nil != err {
 		return
 	}
@@ -224,12 +226,33 @@ func checkCommitArgs(ca commitArgs) error {
 	return nil
 }
 
-func svnDiffCommit(ca commitArgs, ga globalArgs) (err error) {
+// Seems to need a svn add for each entry in the dir on OS X.
+// Could be the older svn version as well on my test machine.
+// Investigate later.
+func svnAddAllInDir(dir string, l Logger) (err error) {
+	infos, err := ioutil.ReadDir(dir)
+	if nil != err {
+		return
+	}
+	for _, inf := range infos {
+		if ".svn" == inf.Name() {
+			continue
+		}
+		fullPath := filepath.Join(dir, inf.Name())
+		err = execPiped(l, "svn", "add", fullPath, "--force")
+		if nil != err {
+			return
+		}
+	}
+	return nil
+}
+
+func svnDiffCommit(ca commitArgs, ga globalArgs, l Logger) (err error) {
 	err = checkCommitArgs(ca)
 	if nil != err {
 		return
 	}
-	err = svnCheckout(ca.ReposUrl, ca.WcPath, ga)
+	err = svnCheckout(ca.ReposUrl, ca.WcPath, ga, l)
 	if nil != err {
 		return
 	}
@@ -241,15 +264,15 @@ func svnDiffCommit(ca commitArgs, ga globalArgs) (err error) {
 	if nil != err {
 		return
 	}
-	err = execPiped("svn", "add", ca.WcPath, "--force")
+	err = svnAddAllInDir(ca.WcPath, l)
 	if nil != err {
 		return
 	}
-	err = svnDeleteMissing(ca.WcPath)
+	err = svnDeleteMissing(ca.WcPath, l)
 	if nil != err {
 		return
 	}
-	err = svnCommit(ca.WcPath, ca.Message, ga)
+	err = svnCommit(ca.WcPath, ca.Message, ga, l)
 	if nil != err {
 		return
 	}
@@ -259,8 +282,8 @@ func svnDiffCommit(ca commitArgs, ga globalArgs) (err error) {
 	return osfix.RemoveAll(ca.WcPath)
 }
 
-func createRepos(reposPath string) (reposUrl string, err error) {
-	err = execPiped("svnadmin", "create", reposPath)
+func createRepos(reposPath string, l Logger) (reposUrl string, err error) {
+	err = execPiped(l, "svnadmin", "create", reposPath)
 	if nil != err {
 		return
 	}
@@ -332,7 +355,7 @@ func createTestFile(td testData, basePath string) error {
 	return ioutil.WriteFile(path, []byte(td.Content), perm)
 }
 
-func setupTest(testPath string) (reposUrl string, srcPath string, err error) {
+func setupTest(testPath string, l Logger) (reposUrl, srcPath string, err error) {
 	err = os.Mkdir(testPath, perm)
 	if nil != err {
 		return
@@ -344,7 +367,7 @@ func setupTest(testPath string) (reposUrl string, srcPath string, err error) {
 		return
 	}
 	reposPath := filepath.Join(testPath, "repos")
-	reposUrl, err = createRepos(reposPath)
+	reposUrl, err = createRepos(reposPath, l)
 	return
 }
 
@@ -355,19 +378,21 @@ func teardownTest(testPath string) {
 	}
 }
 
-func runSelfTest() (err error) {
+func runSelfTest(l Logger) (err error) {
 	fmt.Print("\n\nSelf test --> Start...\n\n\n")
 	testPath := filepath.Join(".", "self_test")
 	ca := commitArgs{}
 	ca.Message = "Hellooo :D"
 	ca.WcPath = filepath.Join(testPath, "wc")
-	ca.ReposUrl, ca.SrcPath, err = setupTest(testPath)
+	ca.ReposUrl, ca.SrcPath, err = setupTest(testPath, l)
 	if nil != err {
 		return
 	}
+	l.Dbg("ReposUrl: ", ca.ReposUrl)
+	l.Dbg("WcPath: ",   ca.WcPath)
 	defer teardownTest(testPath)
 	ga := globalArgs{}
-	err = svnDiffCommit(ca, ga)
+	err = svnDiffCommit(ca, ga, l)
 	if nil != err {
 		return
 	}
@@ -375,7 +400,7 @@ func runSelfTest() (err error) {
 	if nil != err {
 		return
 	}
-	err = svnDiffCommit(ca, ga)
+	err = svnDiffCommit(ca, ga, l)
 	if nil != err {
 		return
 	}
@@ -396,6 +421,38 @@ func parseOsArgs() (args cmdArgs, err error) {
 	return
 }
 
+type Logger interface {
+	Dbg(message ...interface{})
+	Inf(message ...interface{})
+}
+
+type Log struct {
+	level int
+}
+
+func (l *Log) Dbg(message ...interface{}) {
+	if l.level > 1 {
+		fmt.Println(message...)
+	}
+}
+
+func (l *Log) Inf(message ...interface{}) {
+	if l.level > 0 {
+		fmt.Println(message...)
+	}
+}
+
+func newLog(level int) Log {
+	return Log{level}
+}
+
+func getLogLevel(args cmdArgs) int {
+	if args.DebugLog {
+		return 2
+	}
+	return 1
+}
+
 func main() {
 	args, err := parseOsArgs()
 	if nil != err {
@@ -406,14 +463,15 @@ func main() {
 		printUsage()
 		return
 	}
+	l := newLog(getLogLevel(args))
 	if args.RunSelfTest {
-		err = runSelfTest()
+		err = runSelfTest(&l)
 		if nil != err {
 			log.Fatal(err)
 		}
 		return
 	}
-	err = svnDiffCommit(args.commitArgs, args.globalArgs)
+	err = svnDiffCommit(args.commitArgs, args.globalArgs, &l)
 	if nil != err {
 		log.Fatal(err)
 	}
