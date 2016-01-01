@@ -32,6 +32,8 @@ svndc --src PATH --repos URL --wc PATH --message "There are only 12 cylon models
 --self-test  Requires svnadmin. Will create a local repository in 
              the directory ./self_test/repos and use for tests. The
              directory ./self_test will be deleted when tests complete.
+--debug      Print extra information.
+             WARNING: Prints all SVN args including username & password.
 
 SVN Global args (see svn documentaion):
 
