@@ -228,7 +228,7 @@ func checkCommitArgs(ca commitArgs) error {
 	return nil
 }
 
-// Seems to need a svn add for each entry in the dir on OS X.
+// Seems to not work on the root dir in the WC on OS X.
 // Could be the older svn version as well on my test machine.
 // Investigate later.
 func svnAddAllInDir(dir string, l Logger) (err error) {
@@ -236,17 +236,17 @@ func svnAddAllInDir(dir string, l Logger) (err error) {
 	if nil != err {
 		return
 	}
+	paths := []string{}
 	for _, inf := range infos {
 		if ".svn" == inf.Name() {
 			continue
 		}
-		fullPath := filepath.Join(dir, inf.Name())
-		err = execPiped(l, "svn", "add", fullPath, "--force")
-		if nil != err {
-			return
-		}
+		paths = append(paths, filepath.Join(dir, inf.Name()))
 	}
-	return nil
+	args := []string{"add"}
+	args = append(args, paths...)
+	args = append(args, "--force")
+	return execPiped(l, "svn", args...)
 }
 
 func svnDiffCommit(ca commitArgs, ga globalArgs, l Logger) (err error) {
