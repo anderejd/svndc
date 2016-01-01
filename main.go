@@ -389,7 +389,7 @@ func runSelfTest(l Logger) (err error) {
 		return
 	}
 	l.Dbg("ReposUrl: ", ca.ReposUrl)
-	l.Dbg("WcPath: ",   ca.WcPath)
+	l.Dbg("WcPath: ", ca.WcPath)
 	defer teardownTest(testPath)
 	ga := globalArgs{}
 	err = svnDiffCommit(ca, ga, l)
