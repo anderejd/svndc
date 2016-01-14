@@ -69,6 +69,8 @@ type globalArgs struct {
 	Username                string `cmd:"--username"`
 }
 
+type argSlice []string
+
 func cleanWcRoot(wcPath string) (err error) {
 	infos, err := ioutil.ReadDir(wcPath)
 	if nil != err {
@@ -146,30 +148,35 @@ func copyRecursive(srcDir, dstDir string) (err error) {
 	return nil
 }
 
-func appendGlobalArgs(in []string, ga globalArgs) (out []string, err error) {
+func makeArgSlice(ga globalArgs) (argSlice, error) {
 	args, err := cmdflags.MakeArgs(ga)
 	if nil != err {
-		return
+		return argSlice{}, err
 	}
-	out = append(in, args...)
-	return
+	return argSlice(args), nil
 }
 
-func svnCheckout(reposUrl, wcPath string, ga globalArgs, l Logger) (err error) {
+func svnCheckout(reposUrl, wcPath string, extra argSlice, l Logger) error {
 	args := []string{"checkout", reposUrl, wcPath}
-	args, err = appendGlobalArgs(args, ga)
-	if nil != err {
-		return
-	}
+	args = append(args, extra...)
 	return execPiped(l, "svn", args...)
 }
 
-func svnCommit(wcPath, message string, ga globalArgs, l Logger) (err error) {
+func svnCommit(wcPath, message string, extra argSlice, l Logger) error {
 	args := []string{"commit", wcPath, "--message", message}
-	args, err = appendGlobalArgs(args, ga)
-	if nil != err {
-		return
-	}
+	args = append(args, extra...)
+	return execPiped(l, "svn", args...)
+}
+
+func svnCanListRemote(reposUrl string, extra argSlice, l Logger) bool {
+	args := []string{"list", reposUrl}
+	args = append(args, extra...)
+	return nil == execPiped(l, "svn", args...)
+}
+
+func svnImport(srcPath, reposUrl, message string, extra argSlice, l Logger) error {
+	args := []string{"import", srcPath, reposUrl, "--message", message}
+	args = append(args, extra...)
 	return execPiped(l, "svn", args...)
 }
 
@@ -254,7 +261,16 @@ func svnDiffCommit(ca commitArgs, ga globalArgs, l Logger) (err error) {
 	if nil != err {
 		return
 	}
-	err = svnCheckout(ca.ReposUrl, ca.WcPath, ga, l)
+	extra, err := makeArgSlice(ga)
+	if nil != err {
+		return
+	}
+	if !svnCanListRemote(ca.ReposUrl, extra, l) {
+		l.Inf("Could not list repos url, trying svn import.")
+		return svnImport(ca.SrcPath, ca.ReposUrl, ca.Message, extra, l)
+	}
+	l.Inf("Can list repos url, proceeding with checkout.")
+	err = svnCheckout(ca.ReposUrl, ca.WcPath, extra, l)
 	if nil != err {
 		return
 	}
@@ -274,7 +290,7 @@ func svnDiffCommit(ca commitArgs, ga globalArgs, l Logger) (err error) {
 	if nil != err {
 		return
 	}
-	err = svnCommit(ca.WcPath, ca.Message, ga, l)
+	err = svnCommit(ca.WcPath, ca.Message, extra, l)
 	if nil != err {
 		return
 	}
@@ -282,25 +298,6 @@ func svnDiffCommit(ca commitArgs, ga globalArgs, l Logger) (err error) {
 		return
 	}
 	return osfix.RemoveAll(ca.WcPath)
-}
-
-func createRepos(reposPath string, l Logger) (reposUrl string, err error) {
-	err = execPiped(l, "svnadmin", "create", reposPath)
-	if nil != err {
-		return
-	}
-	absReposPath, err := filepath.Abs(reposPath)
-	if nil != err {
-		return
-	}
-	absReposPath = strings.TrimPrefix(absReposPath, "/")
-	absReposPath = "file:///" + absReposPath
-	repos, err := url.Parse(absReposPath)
-	if nil != err {
-		return
-	}
-	reposUrl = repos.String()
-	return
 }
 
 type testData struct {
@@ -369,7 +366,22 @@ func setupTest(testPath string, l Logger) (reposUrl, srcPath string, err error) 
 		return
 	}
 	reposPath := filepath.Join(testPath, "repos")
-	reposUrl, err = createRepos(reposPath, l)
+	err = execPiped(l, "svnadmin", "create", reposPath)
+	if nil != err {
+		return
+	}
+	reposPath = filepath.Join(reposPath, "new folder")
+	absReposPath, err := filepath.Abs(reposPath)
+	if nil != err {
+		return
+	}
+	absReposPath = strings.TrimPrefix(absReposPath, "/")
+	absReposPath = "file:///" + absReposPath
+	repos, err := url.Parse(absReposPath)
+	if nil != err {
+		return
+	}
+	reposUrl = repos.String()
 	return
 }
 
