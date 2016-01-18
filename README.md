@@ -13,6 +13,8 @@ The following steps are automated:
   6. Commit.
   7. Delete working copy. (optional)
 
+If the repository path does not exist, svn import is attempted instead.
+
 All global SVN options are passed through to the svn subprocess.
 
 ```
