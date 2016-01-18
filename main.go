@@ -7,7 +7,6 @@ import "github.com/rajder/svndc/osfix"
 import "io"
 import "io/ioutil"
 import "log"
-import "net/url"
 import "os"
 import "os/exec"
 import "path/filepath"
@@ -376,12 +375,8 @@ func setupTest(testPath string, l Logger) (reposUrl, srcPath string, err error) 
 		return
 	}
 	absReposPath = strings.TrimPrefix(absReposPath, "/")
-	absReposPath = "file:///" + absReposPath
-	repos, err := url.Parse(absReposPath)
-	if nil != err {
-		return
-	}
-	reposUrl = repos.String()
+	absReposPath = strings.Replace(absReposPath, "\\", "/", -1)
+	reposUrl = "file:///" + absReposPath
 	return
 }
 
