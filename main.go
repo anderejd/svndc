@@ -2,8 +2,8 @@ package main
 
 import "errors"
 import "fmt"
-import "github.com/rajder/svndc/cmdflags"
-import "github.com/rajder/svndc/osfix"
+import "github.com/anderejd/svndc/cmdflags"
+import "github.com/anderejd/svndc/osfix"
 import "io"
 import "io/ioutil"
 import "log"
@@ -12,7 +12,7 @@ import "os/exec"
 import "path/filepath"
 import "strings"
 
-const help = `github.com/rajder/svndc (Subversion Diff Commit)
+const help = `github.com/anderejd/svndc (Subversion Diff Commit)
 usage:
 svndc --src PATH --repos URL --wc PATH --message "There are only 12 cylon models." --username GBaltar --password 123Caprica ...
 
