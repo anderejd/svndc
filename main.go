@@ -211,10 +211,11 @@ func svnDeleteMissing(wcPath string, l Logger) (err error) {
 	if len(missing) == 0 {
 		return
 	}
-	args := append([]string{"rm"}, missing...)
-	err = execPiped(l, "svn", args...)
-	if nil != err {
-		return
+	for _, miss := range missing {
+		err = execPiped(l, "svn", "rm", miss)
+		if nil != err {
+			return
+		}
 	}
 	return
 }
