@@ -18,7 +18,7 @@ If the repository path does not exist, svn import is attempted instead.
 All global SVN options are passed through to the svn subprocess.
 
 ```
-github.com/rajder/svndc (Subversion Diff Commit)
+github.com/anderejd/svndc (Subversion Diff Commit)
 usage:
 svndc --src PATH --repos URL --wc PATH --message "There are only 12 cylon models." --username GBaltar --password 123Caprica ...
 
