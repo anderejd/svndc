@@ -203,6 +203,15 @@ func svnGetMissing(wcPath string) (missing []string, err error) {
 	return
 }
 
+// The standardized hack recommended by the svn manual to escape paths
+// containing the at sign when interacting with the svn command line program.
+func applyAtSignWorkaround(path string) string {
+	if strings.Contains(path, "@") {
+		return path + "@"
+	}
+	return path
+}
+
 func svnDeleteMissing(wcPath string, l Logger) (err error) {
 	missing, err := svnGetMissing(wcPath)
 	if nil != err {
@@ -212,6 +221,7 @@ func svnDeleteMissing(wcPath string, l Logger) (err error) {
 		return
 	}
 	for _, miss := range missing {
+		miss = applyAtSignWorkaround(miss)
 		err = execPiped(l, "svn", "rm", miss)
 		if nil != err {
 			return
@@ -248,7 +258,9 @@ func svnAddAllInDir(dir string, l Logger) (err error) {
 		if ".svn" == inf.Name() {
 			continue
 		}
-		paths = append(paths, filepath.Join(dir, inf.Name()))
+		fname := filepath.Join(dir, inf.Name())
+		fname = applyAtSignWorkaround(fname)
+		paths = append(paths, fname)
 	}
 	args := []string{"add"}
 	args = append(args, paths...)
@@ -310,6 +322,7 @@ func makeTestData() []testData {
 	result := []testData{
 		{"1.txt", false, "data1"},
 		{"2.txt", false, "data2"},
+		{"3@1080.txt", false, "at signs can be sneaky with svn"},
 		{"subdir_a", true, ""},
 		{filepath.Join("subdir_a", "3.txt"), false, "data3"},
 		{"subdir_b", true, ""},
@@ -319,13 +332,12 @@ func makeTestData() []testData {
 }
 
 func removeSomeTestFiles(srcPath string) (err error) {
-	err = os.Remove(filepath.Join(srcPath, "1.txt"))
-	if nil != err {
-		return
-	}
-	err = os.Remove(filepath.Join(srcPath, "subdir_a", "3.txt"))
-	if nil != err {
-		return
+	files := []string{"1.txt", "3@1080.txt", "subdir_a/3.txt"}
+	for _, f := range files {
+		err = os.Remove(filepath.Join(srcPath, filepath.FromSlash(f)))
+		if nil != err {
+			return
+		}
 	}
 	return osfix.RemoveAll(filepath.Join(srcPath, "subdir_b"))
 }
