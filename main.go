@@ -262,10 +262,13 @@ func svnAddAllInDir(dir string, l Logger) (err error) {
 		fname = applyAtSignWorkaround(fname)
 		paths = append(paths, fname)
 	}
-	args := []string{"add"}
-	args = append(args, paths...)
-	args = append(args, "--force")
-	return execPiped(l, "svn", args...)
+	for _, p := range paths {
+		err = execPiped(l, "svn", "add", p, "--force")
+		if nil != err {
+			return
+		}
+	}
+	return
 }
 
 func svnDiffCommit(ca commitArgs, ga globalArgs, l Logger) (err error) {
